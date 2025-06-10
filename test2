@@ -1,0 +1,42 @@
+SELECT *
+FROM itm_items main
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM itm_items sub
+    WHERE 
+        sub.work_type = 'tt'
+        AND sub.partitionId = main.partitionId
+        AND sub.path <> main.path
+        AND (
+            /* 情况1: EBL-DC -CHK 处理逻辑 */
+            (
+                main.processType = 'EBL-DC -CHK'
+                AND sub.processType IN ('EBL-DC -CHK', 'EDC-CDC-ADV')
+                AND (
+                    (main.billRefNumber IS NOT NULL AND LENGTH(main.billRefNumber) > 5 AND sub.billRefNumber = main.billRefNumber)
+                    OR
+                    (main.dcNumber IS NOT NULL AND LENGTH(main.dcNumber) > 5 AND sub.dcNumber = main.dcNumber)
+                )
+            )
+            /* 情况2: EDC-CDC-ADV 处理逻辑 */
+            OR (
+                main.processType = 'EDC-CDC-ADV'
+                AND sub.processType IN ('EBL-DC -NFR', 'EDC-CDC-AMD', 'EDC-CDC-ADV')
+                AND main.sgNumber IS NOT NULL
+                AND LENGTH(main.sgNumber) > 5
+                AND sub.sgNumber = main.sgNumber
+            )
+            /* 在此处添加其他40种processType的判断逻辑 */
+            /* 示例模板:
+            OR (
+                main.processType = 'YOUR_PROCESS_TYPE'
+                AND sub.processType IN ('ALLOWED_TYPE1', 'ALLOWED_TYPE2')
+                AND (
+                    (条件1 AND 字段匹配)
+                    OR
+                    (条件2 AND 字段匹配)
+                )
+            )
+            */
+        )
+);
